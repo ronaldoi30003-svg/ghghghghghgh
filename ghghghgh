@@ -1,0 +1,1535 @@
+task.spawn(function()
+    for Index, Connection in pairs(getconnections(game:GetService("ScriptContext").Error)) do
+    
+        Connection:Disable()
+    end
+    while task.wait(1) do
+        for Index, Connection in pairs(getconnections(game:GetService("ScriptContext").Error)) do
+        
+            Connection:Disable()
+        end
+    end
+end)
+
+--------------------------Ui Shit-------------------------
+local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+
+Library:Notify("Hello 808.Lua OWNER", 5)
+Library:Notify("Nigga Version Ready", 5)
+
+local Window = Library:CreateWindow({
+    Title = '808.Lua',
+    Center = true,
+    AutoShow = true,
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
+
+local Tabs = {
+    Main = Window:AddTab('Main'),
+    Combat = Window:AddTab('Combat'),
+    Visuals = Window:AddTab('Visuals'),
+    Player = Window:AddTab('Player'),
+    Exploits = Window:AddTab('Exploits'),
+    World = Window:AddTab('World'),
+    ['UI Settings'] = Window:AddTab('UI Settings'),
+}
+
+--------------------------Combat-------------------------
+local LeftGroupBox = Tabs.Combat:AddLeftGroupbox("Aimbots")
+local RightGroupBox = Tabs.Combat:AddRightGroupbox("Gun Mods")
+
+local NoRecoilEnabled = false
+
+RightGroupBox:AddToggle('NoRecoilToggle', {
+    Text = "No Recoil",
+    Default = false,
+    Risky = true,
+
+    Callback = function(Value)
+        NoRecoilEnabled = Value
+
+        if Value then
+            local str = 'KickUpCameraInfluence'
+            local str2 = 'ShiftGunInfluence'
+            local str3 = 'ShiftCameraInfluence'
+            local str4 = 'RaiseInfluence'
+            local str5 = 'KickUpSpeed'
+
+            for i, v in pairs(getgc(true)) do
+                if type(v) == 'table' and rawget(v, str) then
+                    setreadonly(v, false)
+                    v[str] = 0
+                    v[str2] = 0
+                    v[str3] = 0
+                    v[str4] = 0
+                    v[str5] = 10000000
+                end
+            end
+        end
+    end
+})
+
+--------------------------Visuals-------------------------
+
+local LeftGroupBox = Tabs.Visuals:AddLeftGroupbox("Esp")
+local RightGroupBox = Tabs.Visuals:AddRightGroupbox("More Esp")
+
+
+local corpsesFolder = workspace:WaitForChild("Corpses")
+local Players = game:GetService("Players")
+local localPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local ESPConnections = {}
+local ESPCreated = {}
+local corpseESPEnabled = false
+local showNames = false
+local showDistance = false
+local maxDistance = 10000
+local weaponDrawings = {}
+
+local corpseHighlightColor = Color3.fromRGB(255, 0, 0)
+local corpseNameColor = Color3.new(1, 1, 1)
+local corpseDistanceColor = Color3.new(1, 1, 1)
+
+local textDrawing = Drawing.new("Text")
+
+local Settings = {
+    Enabled = false,
+    Names = false,
+    Name_Color = Color3.fromRGB(255,255,255),
+    Boxes = false,
+    Box_Type = "Corner",
+    Box_Color = Color3.fromRGB(255,255,255),
+    Healthbar = false,
+    Health_High = Color3.fromRGB(0,255,0),
+    Health_Low = Color3.fromRGB(255,0,0),
+    Distance = false,
+    Distance_Color = Color3.fromRGB(255,255,255),
+    Weapon = false, -- IMPORTANT
+    Weapon_Color = Color3.fromRGB(255,255,255),
+    Max_Distance = 1000,
+}
+
+local Drawing = Drawing
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local cornerDrawings = {}
+local outlineDrawings = {}
+
+
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local lp = Players.LocalPlayer
+local connections = {}
+
+local Storage = Instance.new("Folder")
+Storage.Name = "Highlight_Storage"
+Storage.Parent = CoreGui
+
+local FillColor = Color3.fromRGB(175, 25, 255)
+local OutlineColor = Color3.fromRGB(255, 255, 255)
+local FillTransparencyValue = 10
+local OutlineTransparencyValue = 10
+local ChamsEnabled = false
+--------------------------ESP Functions-------------------------
+
+local function CreateFullESP(player)
+    if player == LocalPlayer then return end
+    if ESPCreated[player] then return end
+
+    ESPCreated[player] = true
+
+    createBoxESP(player)
+    CreateHealthESP(player)
+    CreateNameESP(player)
+    CreateDistanceESP(player)
+    CreateWeaponESP(player)
+end
+
+local function isIgnoredCorpse(model)
+    return model.Name:lower():find("infected") ~= nil
+end
+
+local function removeESP(model)
+    local highlight = model:FindFirstChild("CorpseHighlight")
+    if highlight then highlight:Destroy() end
+    local espGui = model:FindFirstChild("CorpseESP")
+    if espGui then espGui:Destroy() end
+end
+
+local function createHighlight(model)
+    if isIgnoredCorpse(model) then return end
+    if not model:FindFirstChild("CorpseHighlight") then
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "CorpseHighlight"
+        highlight.FillColor = corpseHighlightColor
+        highlight.OutlineColor = Color3.new(1, 1, 1)
+        highlight.FillTransparency = 0.5
+        highlight.OutlineTransparency = 0
+        highlight.Adornee = model
+        highlight.Parent = model
+    end
+end
+
+local function createBillboard(model)
+    if isIgnoredCorpse(model) then return end
+    local primary = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+    if not primary then return end
+    removeESP(model)
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "CorpseESP"
+    billboard.Adornee = primary
+    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = model
+
+    local nameLabel
+    if showNames then
+        nameLabel = Instance.new("TextLabel")
+        nameLabel.Name = "CorpseName"
+        nameLabel.Size = UDim2.new(1, 0, 0, 16)          
+        nameLabel.Position = UDim2.new(0, 0, 0, 0)       
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.TextSize = 14
+        nameLabel.TextColor3 = corpseNameColor
+        nameLabel.TextStrokeTransparency = 0.5
+        nameLabel.Font = Enum.Font.GothamBold
+        nameLabel.Text = model.Name
+        nameLabel.Parent = billboard
+    end
+
+    local distanceLabel
+    if showDistance then
+        distanceLabel = Instance.new("TextLabel")
+        distanceLabel.Name = "CorpseDistance"
+        distanceLabel.Size = UDim2.new(1, 0, 0, 16)      
+        distanceLabel.Position = UDim2.new(0, 0, 0, 16)  
+        distanceLabel.BackgroundTransparency = 1
+        distanceLabel.TextSize = 14
+        distanceLabel.TextColor3 = corpseDistanceColor
+        distanceLabel.TextStrokeTransparency = 0.5
+        distanceLabel.Font = Enum.Font.GothamBold
+        distanceLabel.Text = "..."
+        distanceLabel.Parent = billboard
+    end
+
+    local connection
+    connection = RunService.RenderStepped:Connect(function()
+        if not model or not model.Parent or not primary or not primary.Parent then
+            if connection then connection:Disconnect() end
+            return
+        end
+
+        local distance = (workspace.CurrentCamera.CFrame.Position - primary.Position).Magnitude
+        local inRange = distance <= maxDistance
+
+        if nameLabel then
+            nameLabel.Visible = inRange
+        end
+
+        if distanceLabel then
+            if inRange then
+                distanceLabel.Text = tostring(math.floor(distance)) .. "m"
+                distanceLabel.Visible = true
+            else
+                distanceLabel.Visible = false
+            end
+        end
+    end)
+end
+
+
+local function updateCorpseESP(enabled)
+    for _, corpse in pairs(corpsesFolder:GetChildren()) do
+        if corpse:IsA("Model") and not isIgnoredCorpse(corpse) then
+            if enabled then
+                createHighlight(corpse)
+                if showNames or showDistance then
+                    createBillboard(corpse)
+                else
+                    removeESP(corpse)
+                end
+            else
+                removeESP(corpse)
+            end
+        else
+            removeESP(corpse)
+        end
+    end
+end
+
+local function ToTransparency(val)
+    return math.clamp(val / 20, 0, 1)
+end
+
+local function UpdateHighlight(h)
+    h.FillColor = FillColor
+    h.OutlineColor = OutlineColor
+    h.FillTransparency = ToTransparency(FillTransparencyValue)
+    h.OutlineTransparency = ToTransparency(OutlineTransparencyValue)
+end
+
+local function Highlight(plr)
+    if plr == lp then return end
+
+    if Storage:FindFirstChild(plr.Name) then
+        Storage[plr.Name]:Destroy()
+    end
+
+    local h = Instance.new("Highlight")
+    h.Name = plr.Name
+    h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    h.Enabled = ChamsEnabled
+    h.Parent = Storage
+
+    local function ApplyToCharacter(char)
+        h.Adornee = char
+        UpdateHighlight(h)
+    end
+
+    if plr.Character then
+        ApplyToCharacter(plr.Character)
+    end
+
+    connections[plr] = plr.CharacterAdded:Connect(ApplyToCharacter)
+end
+
+local function getWeapon(player)
+    local char = player.Character
+    if char then
+        for _, obj in ipairs(char:GetChildren()) do
+            if obj:IsA("Tool") then
+                return obj.Name
+            end
+        end
+    end
+
+    local backpack = player:FindFirstChildOfClass("Backpack")
+    if backpack then
+        for _, obj in ipairs(backpack:GetChildren()) do
+            if obj:IsA("Tool") then
+                return obj.Name
+            end
+        end
+    end
+
+    -- 🔥 fallback for framework-style games
+    local equipped = char and char:FindFirstChildWhichIsA("Model")
+    if equipped and equipped.Name then
+        return equipped.Name
+    end
+
+    return "None"
+end
+
+local function createBoxESP(player)
+    if cornerDrawings[player] or outlineDrawings[player] then return end
+
+    local corners, outlines = {}, {}
+    for i = 1, 8 do
+        local c = Drawing.new("Line")
+        c.Thickness, c.ZIndex, c.Visible = 1, 2, false
+        table.insert(corners, c)
+
+        local o = Drawing.new("Line")
+        o.Thickness, o.ZIndex, o.Visible = 3, 1, false
+        table.insert(outlines, o)
+    end
+
+    cornerDrawings[player] = corners
+    outlineDrawings[player] = outlines
+
+    RunService.RenderStepped:Connect(function()
+        if not Settings.Enabled or not Settings.Boxes then
+            for i = 1, 8 do
+                corners[i].Visible = false
+                outlines[i].Visible = false
+            end
+            return
+        end
+
+        local char = player.Character
+        if not char then
+            for i = 1, 8 do
+                corners[i].Visible = false
+                outlines[i].Visible = false
+            end
+            return
+        end
+
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChild("Humanoid")
+        if hrp and hum then
+            local camera = workspace.CurrentCamera
+            local charPos = hrp.Position
+            local cameraPos = camera.CFrame.Position
+            local distance = (cameraPos - charPos).Magnitude
+            local pos, onScreen = camera:WorldToViewportPoint(charPos)
+
+            if hum.Health > 0 and onScreen and distance <= Settings.Max_Distance then
+                local scale = 1 / (pos.Z * math.tan(math.rad(camera.FieldOfView / 2)) * 2) * 100
+                local w, h = 40 * scale, 60 * scale
+                local x, y = pos.X - w / 2, pos.Y - h / 2
+                local lw, lh = w * 0.3, h * 0.3
+
+                if Settings.Box_Type == "Corner" then
+                    corners[1].From = Vector2.new(x, y)
+                    corners[1].To = Vector2.new(x + lw, y)
+                    corners[2].From = Vector2.new(x, y)
+                    corners[2].To = Vector2.new(x, y + lh)
+
+                    corners[3].From = Vector2.new(x + w, y)
+                    corners[3].To = Vector2.new(x + w - lw, y)
+                    corners[4].From = Vector2.new(x + w, y)
+                    corners[4].To = Vector2.new(x + w, y + lh)
+
+                    corners[5].From = Vector2.new(x, y + h)
+                    corners[5].To = Vector2.new(x + lw, y + h)
+                    corners[6].From = Vector2.new(x, y + h)
+                    corners[6].To = Vector2.new(x, y + h - lh)
+
+                    corners[7].From = Vector2.new(x + w, y + h)
+                    corners[7].To = Vector2.new(x + w - lw, y + h)
+                    corners[8].From = Vector2.new(x + w, y + h)
+                    corners[8].To = Vector2.new(x + w, y + h - lh)
+                else
+                    corners[1].From = Vector2.new(x, y)
+                    corners[1].To = Vector2.new(x + w, y)
+                    corners[2].From = Vector2.new(x + w, y)
+                    corners[2].To = Vector2.new(x + w, y + h)
+                    corners[3].From = Vector2.new(x + w, y + h)
+                    corners[3].To = Vector2.new(x, y + h)
+                    corners[4].From = Vector2.new(x, y + h)
+                    corners[4].To = Vector2.new(x, y)
+                end
+
+                for i = 1, 8 do
+                    corners[i].Color = Settings.Box_Color
+                    corners[i].Visible = true
+                    outlines[i].From = corners[i].From
+                    outlines[i].To = corners[i].To
+                    outlines[i].Color = Color3.new(0, 0, 0)
+                    outlines[i].Visible = true
+                end
+            else
+                for i = 1, 8 do
+                    corners[i].Visible = false
+                    outlines[i].Visible = false
+                end
+            end
+        else
+            for i = 1, 8 do
+                corners[i].Visible = false
+                outlines[i].Visible = false
+            end
+        end
+    end)
+end
+
+local function CreateHealthESP(player)
+    local outline = Drawing.new("Square")
+    outline.Thickness = 1
+    outline.Color = Color3.new(0, 0, 0)
+    outline.Filled = false
+    outline.Visible = false
+
+    local bar = Drawing.new("Square")
+    bar.Filled = true
+    bar.Color = Settings.Health_High
+    bar.Visible = false
+
+    RunService.RenderStepped:Connect(function()
+        if not Settings.Enabled or not Settings.Healthbar then
+            bar.Visible = false
+            outline.Visible = false
+            return
+        end
+
+        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+            bar.Visible = false
+            outline.Visible = false
+            return
+        end
+
+        local hum = player.Character:FindFirstChild("Humanoid")
+        if not hum then
+            bar.Visible = false
+            outline.Visible = false
+            return
+        end
+
+        local camera = workspace.CurrentCamera
+        local pos, vis = camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
+        local distance = (camera.CFrame.Position - player.Character.HumanoidRootPart.Position).Magnitude
+
+        if vis and hum.Health > 0 and distance <= Settings.Max_Distance then
+            local scale = 1 / (pos.Z * math.tan(math.rad(camera.FieldOfView / 2)) * 2) * 100
+            local h = math.floor(60 * scale)
+            local x, y = math.floor(pos.X - 20 * scale - 8), math.floor(pos.Y - h / 2)
+
+            outline.Size = Vector2.new(4, h)
+            outline.Position = Vector2.new(x - 1, y - 1)
+            outline.Visible = true
+
+            local hpPerc = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+            local barFill = math.floor(h * hpPerc)
+
+            bar.Color = Settings.Health_Low:Lerp(Settings.Health_High, hpPerc)
+
+            bar.Size = Vector2.new(2, barFill)
+            bar.Position = Vector2.new(x, y + h - barFill)
+            bar.Visible = true
+        else
+            bar.Visible = false
+            outline.Visible = false
+        end
+    end)
+end
+
+local function CreateNameESP(player)
+    local name = Drawing.new("Text")
+    name.Center = true
+    name.Outline = true
+    name.Visible = false
+    name.Font = 2
+    name.Size = 13
+    name.Color = Settings.Name_Color
+
+    RunService.RenderStepped:Connect(function()
+        if not Settings.Enabled or not Settings.Names then
+            name.Visible = false
+            return
+        end
+
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = player.Character.HumanoidRootPart
+            local camera = workspace.CurrentCamera
+            local pos, visible = camera:WorldToViewportPoint(hrp.Position)
+            local distance = (camera.CFrame.Position - hrp.Position).Magnitude
+
+            if visible and distance <= Settings.Max_Distance then
+                local scale = 1 / (pos.Z * math.tan(math.rad(camera.FieldOfView / 2)) * 2) * 100
+                local h = 60 * scale
+                name.Text = player.Name
+                name.Position = Vector2.new(pos.X, pos.Y - h / 2 - 15)
+                name.Color = Settings.Name_Color
+                name.Visible = true
+            else
+                name.Visible = false
+            end
+        else
+            name.Visible = false
+        end
+    end)
+end
+
+local function CreateDistanceESP(player)
+    local dist = Drawing.new("Text")
+    dist.Center = true
+    dist.Outline = true
+    dist.Visible = false
+    dist.Font = 2
+    dist.Size = 13
+    dist.Color = Settings.Distance_Color
+
+    RunService.RenderStepped:Connect(function()
+        if not Settings.Enabled or not Settings.Distance then
+            dist.Visible = false
+            return
+        end
+
+        local char = player.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local hrp = char.HumanoidRootPart
+            local camera = workspace.CurrentCamera
+
+            local pos, visible = camera:WorldToViewportPoint(hrp.Position)
+
+            local distanceValue = (camera.CFrame.Position - hrp.Position).Magnitude
+
+            if visible and distanceValue <= Settings.Max_Distance then
+                local scale = 1 / (pos.Z * math.tan(math.rad(camera.FieldOfView / 2)) * 2) * 100
+                local h = 60 * scale
+
+                dist.Text = tostring(math.floor(distanceValue)) .. "m"
+                dist.Position = Vector2.new(pos.X, pos.Y + h / 2 + 13)
+                dist.Visible = true
+            else
+                dist.Visible = false
+            end
+        else
+            dist.Visible = false
+        end
+    end)
+end
+
+local function CreateWeaponESP(player)
+    -- simple placeholder so script doesn't break
+    print("Weapon ESP not implemented for", player.Name)
+end
+
+local function CreateFullESP(player)
+    if player == LocalPlayer then return end
+    if ESPCreated[player] then return end
+
+    ESPCreated[player] = true
+
+    createBoxESP(player)
+    CreateHealthESP(player)
+    CreateNameESP(player)
+    CreateDistanceESP(player)
+    CreateWeaponESP(player)
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+    CreateFullESP(player)
+
+    player.CharacterAdded:Connect(function()
+        task.wait(1)
+        CreateFullESP(player)
+    end)
+end
+
+Players.PlayerAdded:Connect(function(player)
+    CreateFullESP(player)
+
+    player.CharacterAdded:Connect(function()
+        task.wait(1)
+        CreateFullESP(player)
+    end)
+end)
+
+Players.PlayerRemoving:Connect(function(plr)
+    ESPCreated[plr] = nil
+
+    if Storage:FindFirstChild(plr.Name) then
+        Storage[plr.Name]:Destroy()
+    end
+
+    if connections[plr] then
+        connections[plr]:Disconnect()
+        connections[plr] = nil
+    end
+
+    if cornerDrawings[plr] then
+        for _, obj in ipairs(cornerDrawings[plr]) do
+            obj:Remove()
+        end
+        cornerDrawings[plr] = nil
+    end
+
+    if outlineDrawings[plr] then
+        for _, obj in ipairs(outlineDrawings[plr]) do
+            obj:Remove()
+        end
+        outlineDrawings[plr] = nil
+    end
+end)
+
+
+--------------------------ESP Toggles-------------------------
+
+local WeaponToggle = RightGroupBox:AddToggle('Weapon', {
+    Text = "Weapon Esp",
+    Default = false,
+
+    Callback = function(Value)
+        Settings.Weapon = Value
+    end
+})
+
+local BoxesToggle = LeftGroupBox:AddToggle('corpse_esp', {
+    Text = "Body Esp",
+    Default = false,
+
+    Callback = function(Value)
+        corpseESPEnabled = Value
+        updateCorpseESP(Value)
+    end
+})
+
+local Names = LeftGroupBox:AddToggle('show_names', {
+    Text = "Body Names",
+    Default = false,
+
+    Callback = function(Value)
+        showNames = Value
+        if corpseESPEnabled then updateCorpseESP(true) end
+    end
+})
+
+local Distances = LeftGroupBox:AddToggle('show_distance', {
+    Text = "Body Distance",
+    Default = false,
+
+    Callback = function(Value)
+        showDistance = Value
+        if corpseESPEnabled then updateCorpseESP(true) end
+    end
+})
+
+local DistanceSlider = LeftGroupBox:AddSlider('max_distance', {
+    Text = "Max Distance",
+    Min = 1000,
+    Max = 10000,
+    Suffix = "(m)",
+    Default = maxDistance,
+    Rounding = 1,
+
+    Callback = function(Value)
+        maxDistance = Value
+        updateCorpseESP(corpseESPEnabled)
+    end
+})
+
+local EnabledToggle = RightGroupBox:AddToggle('Enabled', {
+    Text = " Main Esp",
+    Default = false,
+
+    Callback = function(Value)
+        Settings.Enabled = Value
+       
+    end
+})
+
+local BoxesToggle = RightGroupBox:AddToggle('Boxes', {
+    Text = "Boxes",
+    Default = false,
+
+    Callback = function(Value)
+        Settings.Boxes = Value
+        
+    end
+})
+
+local HealthbarToggle = RightGroupBox:AddToggle('Healthbar', {
+    Text = "Healthbar",
+    Default = false,
+
+    Callback = function(Value)
+        Settings.Healthbar = Value
+    end   
+})
+
+local Chams = LeftGroupBox:AddToggle('chams_toggle', {
+    Text = "Chams",
+    Default = false,
+
+    Callback = function(state)
+        ChamsEnabled = state
+
+        for _, h in ipairs(Storage:GetChildren()) do
+            if h:IsA("Highlight") then
+                h.Enabled = ChamsEnabled
+            end
+        end
+    end
+})
+
+local FillTransparencySlider = LeftGroupBox:AddSlider('fill_transparency', {
+    Text = "Fill Transparency",
+    Default = FillTransparencyValue,
+    Min = 0,
+    Max = 1,
+    Rounding = 1,
+
+    Callback = function(val)
+        FillTransparencyValue = val
+
+        for _, h in ipairs(Storage:GetChildren()) do
+            if h:IsA("Highlight") then
+                h.FillTransparency = val
+            end
+        end
+    end
+})
+
+local OutlineTransparencySlider = LeftGroupBox:AddSlider('outline_transparency', {
+    Text = "Outline Transparency",
+    Default = OutlineTransparencyValue,
+    Min = 0,
+    Max = 1,
+    Rounding = 1,
+
+    Callback = function(val)
+        OutlineTransparencyValue = val
+
+        for _, h in ipairs(Storage:GetChildren()) do
+            if h:IsA("Highlight") then
+                h.OutlineTransparency = val
+            end
+        end
+    end
+})
+
+local NamesToggle = RightGroupBox:AddToggle('Names', {
+    Text = "Names",
+    Default = false,
+
+    Callback = function(Value)
+        Settings.Names = Value
+        
+    end
+})
+
+local DistanceToggle = RightGroupBox:AddToggle('Distance', {
+    Text = "Distance",
+    Default = false,
+
+    Callback = function(Value)
+        Settings.Distance = Value
+        
+    end
+})
+
+local MapESPToggle = RightGroupBox:AddToggle('map_esp', {
+    Text = "Map ESP",
+    Default = false,
+
+    Callback = function(State)
+        if State then
+            local success, framework = pcall(function()
+                return require(game:GetService("ReplicatedFirst"):WaitForChild("Framework"))
+            end)
+
+            if success and framework and framework.Interface and framework.Interface.Map then
+                framework.Interface.Map:EnableGodview()
+            end
+        end
+    end
+})
+
+local MaxDistanceSlider = RightGroupBox:AddSlider('Max_Distance', {
+    Text = "Max Distance",
+    Min = 0,
+    Max = 10000,
+    Suffix = "(m)",
+    Default = 1000,
+    Rounding = 1,
+
+    Callback = function(Value)
+        Settings.Max_Distance = Value
+        
+    end
+})
+
+--------------------------World Shit-------------------------
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+
+local LeftGroupBox = Tabs.World:AddLeftGroupbox("World")
+local RightGroupBox = Tabs.World:AddRightGroupbox("More World")
+
+local AmbientR, AmbientG, AmbientB = 1, 1, 1
+local AmbientEnabled = false
+
+local TechnologyEnabled = false
+local SelectedTechnology = "Voxel"
+
+local Socolo = {}
+local customSaturation = 1
+local satEnabled = false
+
+local RunService = game:GetService("RunService")
+local timeConnection
+local customTime = 12
+local originalAtmosphere = {}
+local noFogConnection
+
+local originalFog = {
+    FogStart = Lighting.FogStart,
+    FogEnd = Lighting.FogEnd
+}
+
+--------------------------World Functions-------------------------
+
+local function getSky()
+    local sky = Lighting:FindFirstChildOfClass("Sky")
+
+    if not sky then
+        sky = Instance.new("Sky")
+        sky.Parent = Lighting
+    end
+
+    return sky
+end
+
+local function ApplySkybox(name)
+    local Sky = getSky()
+    local data = _G.SkyBoxes[name]
+    if data then
+        for face, asset in pairs(data) do
+            Sky[face] = asset
+        end
+        _G.CurrentSkyboxName = name
+    end
+end
+
+_G.SkyBoxes = {
+    Standard = {
+        SkyboxBk = "",
+        SkyboxDn = "",
+        SkyboxFt = "",
+        SkyboxLf = "",
+        SkyboxRt = "",
+        SkyboxUp = ""
+    },
+
+    ["Among Us"] = {
+        SkyboxBk = "rbxassetid://5752463190",
+        SkyboxDn = "rbxassetid://5752463190",
+        SkyboxFt = "rbxassetid://5752463190",
+        SkyboxLf = "rbxassetid://5752463190",
+        SkyboxRt = "rbxassetid://5752463190",
+        SkyboxUp = "rbxassetid://5752463190"
+    },
+
+    ["Doge"] = {
+        SkyboxBk = "rbxassetid://159713165",
+        SkyboxDn = "rbxassetid://159713165",
+        SkyboxFt = "rbxassetid://159713165",
+        SkyboxLf = "rbxassetid://159713165",
+        SkyboxRt = "rbxassetid://159713165",
+        SkyboxUp = "rbxassetid://159713165"
+    },
+
+    ["Spongebob"] = {
+        SkyboxBk = "rbxassetid://277099484",
+        SkyboxDn = "rbxassetid://277099500",
+        SkyboxFt = "rbxassetid://277099554",
+        SkyboxLf = "rbxassetid://277099531",
+        SkyboxRt = "rbxassetid://277099589",
+        SkyboxUp = "rbxassetid://277101591"
+    }
+}
+--------------------------World Toggles-------------------------
+_G.CurrentSkyboxName = _G.CurrentSkyboxName or "Standard"
+local Sky = getSky()
+ApplySkybox(_G.CurrentSkyboxName)
+
+LeftGroupBox:AddDropdown('SkySelect', {
+    Text = "Skybox",
+    Default = "Standard",
+    Values = { "Standard","Among Us","Doge","Spongebob","Deep Space","Winter","Clouded Sky" },
+
+    Callback = function(val)
+        ApplySkybox(val)
+    end
+})
+
+local TechnologyToggle = LeftGroupBox:AddToggle('CustomTechnology', {
+    Text = "Custom Technology",
+    Default = false,
+    Flag = "Visuals/TechnologyEnabled",
+
+    Callback = function(Value)
+        TechnologyEnabled = Value
+
+        if Value then
+            pcall(function()
+                Lighting.Technology = Enum.Technology[SelectedTechnology]
+            end)
+        else
+            pcall(function()
+                Lighting.Technology = Enum.Technology.Future
+            end)
+        end
+    end
+})
+
+local TechnologyDropdown = LeftGroupBox:AddDropdown('TechnologyMode', {
+    Text = "Technology Mode",
+    Values = { "Voxel", "ShadowMap", "Legacy", "Compatibility", "Future" },
+    Default = "Voxel",
+
+    Callback = function(val)
+        SelectedTechnology = val
+
+        if TechnologyEnabled then
+            pcall(function()
+                Lighting.Technology = Enum.Technology[val]
+            end)
+        end
+    end
+})
+
+local NoCloudsToggle = RightGroupBox:AddToggle('World_NoClouds', {
+    Text = "No Clouds",
+    Default = false,
+
+    Callback = function(Value)
+        local terrain = workspace:FindFirstChildOfClass("Terrain")
+
+        if terrain then
+            local clouds = terrain:FindFirstChildOfClass("Clouds")
+
+            if clouds then
+                clouds.Enabled = not Value
+            end
+        end
+    end
+})
+
+
+local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
+if not cc then
+    cc = Instance.new("ColorCorrectionEffect")
+    cc.Name = "World_SaturationEffect"
+    cc.Parent = Lighting
+end
+
+local CustomSaturationToggle = LeftGroupBox:AddToggle('World_CustomSaturation', {
+    Text = "Custom Saturation",
+    Default = false,
+
+    Callback = function(Value)
+        satEnabled = Value
+
+        if satEnabled then
+            cc.Saturation = customSaturation
+            cc.Enabled = true
+        else
+            cc.Enabled = false
+        end
+    end
+})
+
+local SaturationSlider = LeftGroupBox:AddSlider('World_SaturationValue', {
+    Text = "Saturation",
+    Min = 0,
+    Max = 3,
+    Suffix = "(x)",
+    Default = 1,
+    Rounding = 1,
+
+    Callback = function(Value)
+        customSaturation = Value
+
+        if satEnabled then
+            cc.Saturation = customSaturation
+        end
+    end
+})
+
+local CustomTimeToggle = LeftGroupBox:AddToggle('World_CustomTime', {
+    Text = "Custom Time",
+    Default = false,
+
+    Callback = function(Value)
+        if Value then
+            if timeConnection then timeConnection:Disconnect() end
+            timeConnection = RunService.RenderStepped:Connect(function()
+                Lighting.ClockTime = customTime
+            end)
+        else
+            if timeConnection then
+                timeConnection:Disconnect()
+                timeConnection = nil
+            end
+        end
+    end
+})
+
+local CustomTimeSlider = LeftGroupBox:AddSlider('World_CustomTimeValue', {
+    Text = "Custom Time",
+    Min = 0,
+    Max = 24,
+    Suffix = "(hr)",
+    Default = 12,
+    Rounding = 1,
+
+    Callback = function(Value)
+        customTime = Value
+    end
+})
+
+local FullBrightToggle = RightGroupBox:AddToggle('FullBrightToggle', {
+    Text = "Full Bright",
+    Default = false,
+
+    Callback = function(Value)
+        local Lighting = game:GetService("Lighting")
+        _G.FullBrightEnabled = Value
+
+        if not _G.NormalLightingSettings then
+            _G.NormalLightingSettings = {
+                Brightness = Lighting.Brightness,
+                ClockTime = Lighting.ClockTime,
+                FogEnd = Lighting.FogEnd,
+                GlobalShadows = Lighting.GlobalShadows,
+                Ambient = Lighting.Ambient,
+                OutdoorAmbient = Lighting.OutdoorAmbient,
+                ColorShift_Bottom = Lighting.ColorShift_Bottom,
+                ColorShift_Top = Lighting.ColorShift_Top
+            }
+        end
+
+        local function applyFullBright()
+            Lighting.Brightness = 2
+            Lighting.ClockTime = 12
+            Lighting.FogEnd = 1e6
+            Lighting.GlobalShadows = false
+            Lighting.Ambient = Color3.new(1, 1, 1)
+            Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+            Lighting.ColorShift_Top = Color3.new(0, 0, 0)
+            Lighting.ColorShift_Bottom = Color3.new(0, 0, 0)
+        end
+
+        local function restoreLighting()
+            for prop, value in pairs(_G.NormalLightingSettings) do
+                Lighting[prop] = value
+            end
+        end
+
+        if Value then
+            applyFullBright()
+        else
+            restoreLighting()
+        end
+    end
+})
+
+local NoFogToggle = RightGroupBox:AddToggle('World_NoFog', {
+    Text = "No Fog",
+    Default = false,
+
+    Callback = function(Value)
+        if Value then
+            -- save atmosphere once
+            local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
+            if atmosphere and not next(originalAtmosphere) then
+                originalAtmosphere = {
+                    Density = atmosphere.Density,
+                    Haze = atmosphere.Haze,
+                    Glare = atmosphere.Glare,
+                    Offset = atmosphere.Offset
+                }
+            end
+
+            if noFogConnection then
+                noFogConnection:Disconnect()
+            end
+
+            noFogConnection = RunService.RenderStepped:Connect(function()
+                Lighting.FogStart = 1e6
+                Lighting.FogEnd = 1e6
+
+                local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
+                if atmosphere then
+                    atmosphere.Density = 0
+                    atmosphere.Haze = 0
+                    atmosphere.Glare = 0
+                    atmosphere.Offset = 0
+                end
+            end)
+
+        else
+            if noFogConnection then
+                noFogConnection:Disconnect()
+                noFogConnection = nil
+            end
+
+            Lighting.FogStart = originalFog.FogStart
+            Lighting.FogEnd = originalFog.FogEnd
+
+            local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
+            if atmosphere and next(originalAtmosphere) then
+                atmosphere.Density = originalAtmosphere.Density
+                atmosphere.Haze = originalAtmosphere.Haze
+                atmosphere.Glare = originalAtmosphere.Glare
+                atmosphere.Offset = originalAtmosphere.Offset
+            end
+        end
+    end
+})
+
+local NoShadowsToggle = RightGroupBox:AddToggle('World_NoShadows', {
+    Text = "No Shadows",
+    Default = false,
+
+    Callback = function(Value)
+        Lighting.GlobalShadows = not Value
+    end
+})
+
+local CustomAmbient = RightGroupBox:AddToggle('World_CustomAmbient', {
+    Text = "Custom Ambient",
+    Default = false,
+
+    Callback = function(Value)
+        AmbientEnabled = Value
+
+        if AmbientEnabled then
+            RunService:BindToRenderStep("CustomAmbient", Enum.RenderPriority.Last.Value, function()
+                Lighting.Ambient = Color3.new(AmbientR, AmbientG, AmbientB)
+            end)
+        else
+            RunService:UnbindFromRenderStep("CustomAmbient")
+            Lighting.Ambient = Color3.new(1, 1, 1)
+        end
+    end
+})
+
+RightGroupBox:AddSlider('AmbientR', {
+    Text = "Red",
+    Min = 0,
+    Max = 1,
+    Default = 1,
+    Rounding = 2,
+
+    Callback = function(v)
+        AmbientR = v
+    end
+})
+
+RightGroupBox:AddSlider('AmbientG', {
+    Text = "Green",
+    Min = 0,
+    Max = 1,
+    Default = 1,
+    Rounding = 2,
+
+    Callback = function(v)
+        AmbientG = v
+    end
+})
+
+RightGroupBox:AddSlider('AmbientB', {
+    Text = "Blue",
+    Min = 0,
+    Max = 1,
+    Default = 1,
+    Rounding = 2,
+
+    Callback = function(v)
+        AmbientB = v
+    end
+})
+
+--------------------------Exploits-------------------------
+local LeftGroupBox = Tabs.Exploits:AddLeftGroupbox("ShittyTitty")
+local RightGroupBox = Tabs.Exploits:AddRightGroupbox("Booby")
+
+local InfiniteJumpEnabled = false
+local JumpPower = 50
+local HoldingSpace = false
+local InfiniteJumpEnabled = false
+
+local walkingSpeed = 16
+local runningSpeed = 20
+local walkEnabled = false
+local runEnabled = false
+local isRunning = false
+
+local AntiAimEnabled = false
+local AntiAimMode = "Off" -- Off, Up, Down, Jitter
+local jitterUp = true
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local lp = Players.LocalPlayer
+
+local AntiAimEnabled = false
+local AntiAimMode = "Off"
+local jitter = true
+
+local function getJoints(char)
+    if not char then return end
+
+    local upperTorso = char:FindFirstChild("UpperTorso")
+    local head = char:FindFirstChild("Head")
+
+    if not upperTorso or not head then return end
+
+    local waist = upperTorso:FindFirstChild("Waist")
+    local neck = head:FindFirstChild("Neck")
+
+    return waist, neck
+end
+--------------------------Exploits toggle-------------------------
+-- Infinite Jump
+LeftGroupBox:AddToggle('InfiniteJump_Enabled', {
+    Text = "Infinite Jump (Don't Spam)",
+    Default = false,
+
+    Callback = function(state)
+        InfiniteJumpEnabled = state and true or false
+    end
+})
+
+LeftGroupBox:AddSlider('InfiniteJump_Power', {
+    Text = "Jump Power",
+    Min = 10,
+    Max = 100,
+    Suffix = "(Power)",
+    Default = 50,
+    Decimals = 1,
+    Rounding = 1,
+
+    Callback = function(value)
+        JumpPower = tonumber(value) or 50
+    end
+})
+
+-- Walking Speed Toggle
+RightGroupBox:AddToggle('WalkingSpeed_Enabled', {
+    Text = "Walking Speed",
+    Default = false,
+
+    Callback = function(state)
+        walkEnabled = state and true or false
+    end
+})
+
+-- Walking Speed Slider
+RightGroupBox:AddSlider('WalkingSpeed_Value', {
+    Text = "Walking Speed",
+    Min = 16,
+    Max = 21,
+    Suffix = "(Speed)",
+    Default = 16,
+    Decimals = 1,
+    Rounding = 1,
+
+    Callback = function(val)
+        walkingSpeed = tonumber(val) or 16
+    end
+})
+
+-- Running Speed Toggle
+RightGroupBox:AddToggle('RunningSpeed_Enabled', {
+    Text = "Running Speed (Hold Shift)",
+    Default = false,
+
+    Callback = function(state)
+        runEnabled = state and true or false
+    end
+})
+
+-- Running Speed Slider
+RightGroupBox:AddSlider('RunningSpeed_Value', {
+    Text = "Running Speed",
+    Min = 20,
+    Max = 30,
+    Suffix = "(Speed)",
+    Default = 20,
+    Decimals = 1,
+    Rounding = 1,
+
+    Callback = function(val)
+        runningSpeed = tonumber(val) or 20
+    end
+})
+
+RightGroupBox:AddDropdown('AntiAim_Mode', {
+    Text = "Anti Aim Mode",
+    Default = "Off",
+    Values = { "Off", "Up", "Down", "Jitter" },
+
+    Callback = function(val)
+        AntiAimMode = val
+    end
+})
+
+RightGroupBox:AddToggle('AntiAim_Toggle', {
+    Text = "Anti Aim",
+    Default = false,
+
+    Callback = function(state)
+        AntiAimEnabled = state
+    end
+})
+--------------------------Random code shit-------------------------
+local UserInputService = game:GetService("UserInputService")
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe then
+        if input.KeyCode == Enum.KeyCode.Space then
+            HoldingSpace = true
+        elseif input.KeyCode == Enum.KeyCode.LeftShift then
+            isRunning = true
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Space then
+        HoldingSpace = false
+    elseif input.KeyCode == Enum.KeyCode.LeftShift then
+        isRunning = false
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    local character = LocalPlayer.Character
+    if InfiniteJumpEnabled and HoldingSpace and character then
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.Velocity = Vector3.new(hrp.Velocity.X, JumpPower, hrp.Velocity.Z)
+        end
+    end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    local humanoid = char:WaitForChild("Humanoid", 5)
+    if humanoid then
+        humanoid.JumpPower = JumpPower
+    end
+end)
+
+game:GetService("RunService").Heartbeat:Connect(function()
+    local hum = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if hum then
+        if runEnabled and isRunning then
+            hum.WalkSpeed = runningSpeed
+        elseif walkEnabled then
+            hum.WalkSpeed = walkingSpeed
+        end
+    end
+end)
+
+
+game.Players.LocalPlayer.CharacterAdded:Connect(function(char)
+    local hum = char:WaitForChild("Humanoid")
+    task.wait(0.2)
+    if runEnabled and isRunning then
+        hum.WalkSpeed = runningSpeed
+    elseif walkEnabled then
+        hum.WalkSpeed = walkingSpeed
+    end
+end)
+
+local function getRoot()
+    local char = lp.Character
+    if not char then return end
+    return char:FindFirstChild("HumanoidRootPart")
+end
+
+local originalWaist, originalNeck
+local waist, neck
+
+local function cacheCharacter(char)
+    task.wait(0.2)
+
+    waist, neck = getJoints(char)
+
+    if waist then
+        originalWaist = waist.C0
+    end
+
+    if neck then
+        originalNeck = neck.C0
+    end
+end
+
+lp.CharacterAdded:Connect(cacheCharacter)
+
+local function isFirstPerson()
+    local char = lp.Character
+    local cam = workspace.CurrentCamera
+    if not char or not cam then return false end
+
+    local head = char:FindFirstChild("Head")
+    if not head then return false end
+
+    return (cam.CFrame.Position - head.Position).Magnitude < 1.3
+end
+
+RunService.RenderStepped:Connect(function()
+    if not AntiAimEnabled then return end
+    if isFirstPerson() then return end
+
+    local char = lp.Character
+    if not char or not waist or not neck then return end
+    if not originalWaist or not originalNeck then return end
+
+    local angle = 0
+
+    if AntiAimMode == "Up" then
+        angle = math.rad(-60)
+
+    elseif AntiAimMode == "Down" then
+        angle = math.rad(60)
+
+    elseif AntiAimMode == "Jitter" then
+        jitter = not jitter
+        angle = jitter and math.rad(-60) or math.rad(60)
+    else
+        return
+    end
+
+    waist.C0 = originalWaist * CFrame.Angles(angle, 0, 0)
+    neck.C0 = originalNeck * CFrame.Angles(angle * 0.5, 0, 0)
+end)
+
+lp.CharacterAdded:Connect(function()
+    originalWaist = nil
+    originalNeck = nil
+    waist = nil
+    neck = nil
+end)
+--------------------------UI settings shit-------------------------
+task.spawn(function()
+    while task.wait(1) do
+        for _, obj in ipairs(Storage:GetChildren()) do
+            if not obj.Parent then
+                obj:Destroy()
+            end
+        end
+
+        if Settings.Enabled then
+            update_elements()
+        end
+    end
+end)
+
+
+task.spawn(function()
+    while task.wait(2) do
+        if _G.CurrentSkyboxName then
+            ApplySkybox(_G.CurrentSkyboxName)
+        end
+    end
+end)
+
+
+Library.KeybindFrame.Visible = true
+
+Library:OnUnload(function()
+    WatermarkConnection:Disconnect()
+    print('Unloaded!')
+    Library.Unloaded = true
+end)
+
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+MenuGroup:AddToggle('keybindlist', {
+        Text = 'Keybind List',
+        Default = Library.KeybindFrame.Visible,
+    
+        Callback = function(Value)
+            Library.KeybindFrame.Visible = Value
+        end
+    })
+MenuGroup:AddButton('Unload', function() Library:Unload() end)
+MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'End', NoUI = true, Text = 'Menu keybind' })
+Library.ToggleKeybind = Options.MenuKeybind
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
+ThemeManager:SetFolder('MyScriptHub')
+SaveManager:SetFolder('MyScriptHub/specific-game')
+SaveManager:BuildConfigSection(Tabs['UI Settings'])
+ThemeManager:ApplyToTab(Tabs['UI Settings'])
+SaveManager:LoadAutoloadConfig()
